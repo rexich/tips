@@ -1,5 +1,9 @@
 # Chef
 
+Chef is a configuration management tool written in Ruby and Erlang. It
+uses a pure-Ruby, domain-specific language (DSL) for writing system configuration "recipes".
+
+
 ## Installing
 Chef client:
 ```sh
@@ -42,10 +46,39 @@ $ curl -L https://omnitruck.chef.io/install.sh | sudo bash -s -- \
   the server
 - Ohai detects attributes on the node and provides them to `chef-client`
   at the start of every client's run
-- `knife` is a [tool](https://docs.chef.io/knife.html) that provides an
+- `knife` is [a tool](https://docs.chef.io/knife.html) that provides an
   interface between local chef-repo and the Chef server, used to manage:
   - nodes, cookbooks, recipes, roles
   - data bags (stores of JSON data, including encrypted ones)
   - environments, cloud resources (including provisioning)
   - installation of `chef-client` on management workstations
   - searching of indexed data on the Chef server
+
+
+## `file` resource
+
+```ruby
+file 'name' do
+  atomic_update              TrueClass, FalseClass # default: true
+  backup                     FalseClass, Integer # default: 5
+  checksum                   String # default: nothing
+  content                    String # what will be written in the file
+  force_unlink               TrueClass, FalseClass # default: false
+  group                      String, Integer
+  inherits                   TrueClass, FalseClass # Windows only
+  manage_symlink_source      TrueClass, FalseClass, NilClass # nil
+  mode                       String, Integer # ex. 0755, 0666, etc.
+  notifies                   # :action, 'resource[name]', :timer
+  owner                      String, Integer
+  path                       String # default: 'name' if not specified
+  provider                   Chef::Provider::File
+  rights                     Hash # Windows only
+  sensitive                  TrueClass, FalseClass # default: false
+  subscribes                 # :action, 'resource[name]', :timer
+  verify                     String, Block # perform recipe if given
+                                           # code block returns true
+  action                     Symbol # default: :create if not specified
+end
+```
+- Actions can be one of: `:create` (default), `:create_if_missing`,
+  `:delete`, `:nothing`, `:touch`
