@@ -58,9 +58,10 @@ $ curl -L https://omnitruck.chef.io/install.sh | sudo bash -s -- \
 
 ## Recipes
 
-[Recipe](https://docs.chef.io/recipes.html) is a Ruby file that
+A [recipe](https://docs.chef.io/recipes.html) is a Ruby file that
 represents a collection of resources, used to define everything that is
-required to configure a part of a system.
+required to configure a part of a system. In other words, it is an
+ordered series of configuration states.
 It must be stored in a cookbook, may be included in another recipe, may
 depend on one or more recipes, must be added to a run list before
 running `chef-client`, and is always executed in the same order as is
@@ -68,6 +69,21 @@ listed in a runlist.
 
 - Including a recipe: `include_recipe 'recipe'`
 - Assign a dependency to a recipe: `depends 'apache2'`
+
+
+## Resources
+
+A [resource](https://docs.chef.io/resource.html) is a policy statement
+that describes the desired state of a part of the system.
+It also describes the steps to bring that part to the desired state.
+
+Several resources are grouped into recipes. Resources declare what state
+part of the system should be in, but not how to get to that state - that
+is handled by Chef, so we don't have to worry about it.
+
+Resources can generate a file, install a package, configure a service.
+All resources have actions, and if an action is not given, usually the
+default (more permissive) action is performed.
 
 
 ## `file` resource
@@ -99,6 +115,7 @@ file 'name' do
   action                     Symbol # default: :create if not specified
 end
 ```
+
 - Actions can be one of: `:create` (default), `:create_if_missing`,
   `:delete`, `:nothing`, `:touch`
 - Create a file:
@@ -157,5 +174,31 @@ end
 file '/root/lol.txt' do
   content IO.read('/tmp/lol.txt')
   action :create
+end
+```
+
+
+## `apt_update` resource
+
+The [`apt_update` resource](https://docs.chef.io/resource_apt_update.html)
+can be used to manage Apt repository updates of software lists on Ubuntu
+and Debian machines.
+
+```ruby
+apt_update 'name' do
+  frequency                  Integer  # number of seconds to wait until
+                                      # next update to be performed
+  action                     Symbol # default: :periodic if unspecified
+end
+```
+
+- Actions can be one of: `:nothing`, `:periodic` (default), or `:update`
+- `:periodic` will update each time the `frequency` number of seconds
+  passes, and `:update` will update at each run of `chef-client`
+- Example: update the cache every 24 hours (86400 seconds)
+```ruby
+apt_update 'update apt cache every day' do
+  frequency 86_400
+  action :periodic
 end
 ```
