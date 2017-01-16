@@ -204,6 +204,77 @@ end
 ```
 
 
+## `user` resource
+
+The [`user` resource](https://docs.chef.io/resource_user.html) lets us
+add users, update existing ones, remove users, and lock or unlock their
+passwords on the node.
+
+```ruby
+user 'name' do
+  comment                    String # Comments about the user
+  force                      TrueClass, FalseClass # force removing a user
+                                # be careful if the user is logged in,
+                                # also their home directory will be removed
+                                # and maybe they share it with other users!
+  gid                        String, Integer  # group name or ID
+  home                       String # path to home directory
+  iterations                 Integer # macOS only
+  manage_home                TrueClass, FalseClass  # whether to do something
+                                # with home directory on :create or :modify
+  non_unique                 TrueClass, FalseClass  # create a duplicate user
+  notifies                   # :action, 'resource[name]', :timer
+  password                   String # needs libshadow-ruby1.8 to be installed
+                                # shadow hash of the password
+  provider                   Chef::Provider::User
+  salt                       String # macOS only
+  shell                      String # path to login shell executable
+  subscribes                 # :action, 'resource[name]', :timer
+  system                     TrueClass, FalseClass  # create a system user
+  uid                        String, Integer  # user ID
+  username                   String # default: 'name' if not specified
+  action                     Symbol # default: :create if not specified
+end
+```
+
+- Action can be one of: `:create` (default, create or update user),
+  `:lock`, `:manage` (for existing user, does nothing if user does not
+  exist), `:modify` (for existing user, raises an exception if user does
+  not exist, `:nothing`, `:remove`, `:unlock`
+- Creating a password hash:
+```sh
+$ mkpasswd -m sha-512
+
+# or
+
+$ openssl passwd -1 "theplaintextpassword"
+```
+- Create a user named 'random':
+```ruby
+user 'random' do
+  manage_home true
+  comment 'User Random'
+  uid '1234'
+  gid '1234'
+  home '/home/random'
+  shell '/bin/bash'
+  password '$1$JJsvHslV$szsCjVEroftprNn4JHtDi'
+end
+```
+- Create a system user with a variable:
+```ruby
+user_home = "/home/#{node['cookbook_name']['user']}"
+
+user node['cookbook_name']['user'] do
+  gid node['cookbook_name']['group']
+  shell '/bin/bash'
+  home user_home
+  system true
+  action :create
+end
+```
+
+
 ## `group` resource
 
 The [`group` resource](https://docs.chef.io/resource_group.html) lets us
@@ -362,8 +433,7 @@ package 'Install Apache' do
   end
 end
 ```
-- Install the [Bundler Ruby gem](http://rubygems.rubyforge.org/
-rubygems-update/Gem/DependencyInstaller.html):
+- Install the Bundler Ruby gem:
 ```ruby
 gem_package 'bundler' do
   options(:prerelease => true, :format_executable => false)
@@ -473,6 +543,14 @@ end
 %w{package-a package-b package-c package-d}.each do |pkg|
   package pkg do
     action :upgrade
+  end
+end
+```
+- Use a hash to install several gems with specific versions at once:
+```ruby
+{"fog" => "0.6.0", "highline" => "1.6.0"}.each do |g,v|
+  gem_package g do
+    version v
   end
 end
 ```
