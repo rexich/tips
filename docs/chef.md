@@ -116,7 +116,7 @@ file 'name' do
 end
 ```
 
-- Actions can be one of: `:create` (default), `:create_if_missing`,
+- Action can be one of: `:create` (default), `:create_if_missing`,
   `:delete`, `:nothing`, `:touch`
 - Create a file:
 ```ruby
@@ -182,7 +182,7 @@ end
 
 The [`apt_update` resource](https://docs.chef.io/resource_apt_update.html)
 can be used to manage Apt repository updates of software lists on Ubuntu
-and Debian machines.
+and Debian nodes.
 
 ```ruby
 apt_update 'name' do
@@ -192,7 +192,7 @@ apt_update 'name' do
 end
 ```
 
-- Actions can be one of: `:nothing`, `:periodic` (default), or `:update`
+- Action can be one of: `:nothing`, `:periodic` (default), or `:update`
 - `:periodic` will update each time the `frequency` number of seconds
   passes, and `:update` will update at each run of `chef-client`
 - Example: update the cache every 24 hours (86400 seconds)
@@ -200,5 +200,44 @@ end
 apt_update 'update apt cache every day' do
   frequency 86_400
   action :periodic
+end
+```
+
+
+## `group` resource
+
+The [`group` resource](https://docs.chef.io/resource_group.html) lets us
+manage groups on a node.
+
+```ruby
+group 'name' do
+  append                     TrueClass, FalseClass # default: false
+  excluded_members           Array # ['user1, 'user2']
+  gid                        String, Integer  # group ID
+  group_name                 String # default: 'name' if not specified
+  members                    Array  # ['user1, 'user2']
+  non_unique                 TrueClass, FalseClass  # avoids group ID
+                                # duplication, default: false
+  notifies                   # see description
+  provider                   Chef::Provider::Group
+  subscribes                 # see description
+  system                     TrueClass, FalseClass  # show if a group
+                                # belongs to a system group
+  action                     Symbol # default: :create if not specified
+  ignore_failure             TrueClass, FalseClass # default: false
+end
+```
+
+- Action can be one of: `:create` (default), `:manage` (does not rise an
+  exception if group does not exist, `:modify` (for existing group only,
+  rises an exception if group does not exist), `:nothing`, `:remove`
+- If `append true`, adds `members` to the `group_name` or `name`, and
+  removes `excluded_members` from the `group_name` or `name`
+- Append users to a group:
+```ruby
+group 'www-data' do
+  action :modify
+  members ['maintenance', 'writers']
+  append true
 end
 ```
