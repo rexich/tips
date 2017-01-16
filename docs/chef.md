@@ -57,6 +57,10 @@ $ curl -L https://omnitruck.chef.io/install.sh | sudo bash -s -- \
 
 ## `file` resource
 
+The [`file` resource](https://docs.chef.io/resource_file.html) allows us
+to work with files on the node, including creating, deleting, changing
+contents and/or access rights, etc.
+
 ```ruby
 file 'name' do
   atomic_update              TrueClass, FalseClass # default: true
@@ -82,3 +86,59 @@ end
 ```
 - Actions can be one of: `:create` (default), `:create_if_missing`,
   `:delete`, `:nothing`, `:touch`
+- Examples:
+  - Create a file:
+```ruby
+file '/tmp/something' do
+  owner 'root'
+  group 'root'
+  mode '0755'
+  action :create
+end
+```
+  - Delete a file:
+```ruby
+file '/tmp/something' do
+  action :delete
+end
+
+```
+  - Set file modes:
+```ruby
+file '/tmp/something' do
+  mode '0755'
+end
+```
+  - Delete a repository using yum to scrub the cache
+```ruby
+# the following code sample thanks to gaffneyc @ https://gist.github.com/918711
+
+execute 'clean-yum-cache' do
+  command 'yum clean all'
+  action :nothing
+end
+
+file '/etc/yum.repos.d/bad.repo' do
+  action :delete
+  notifies :run, 'execute[clean-yum-cache]', :immediately
+  notifies :create, 'ruby_block[reload-internal-yum-cache]', :immediately
+end
+```
+  - Write a string to a file:
+```ruby
+status_file = '/path/to/file/status_file'
+
+file status_file do
+  owner 'root'
+  group 'root'
+  mode '0755'
+  content 'My favourite foremost coastal Antarctic shelf, oh Larsen B!'
+end
+```
+  - Create a file from a copy:
+```ruby
+file '/root/1.txt' do
+  content IO.read('/tmp/1.txt')
+  action :create
+end
+```
