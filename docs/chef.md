@@ -123,7 +123,7 @@ end
 file '/etc/apt/sources.list.d/unnecessary-repo.list' do
   action :delete
   notifies :run, 'execute[clean-apt-cache]', :immediately
-  notifies :run, 'execute[apt-get-update], :immediately
+  notifies :run, 'execute[apt-get-update]', :immediately
 end
 ```
 - Write a string to a file:
