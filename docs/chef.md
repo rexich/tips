@@ -218,9 +218,9 @@ group 'name' do
   members                    Array  # ['user1, 'user2']
   non_unique                 TrueClass, FalseClass  # avoids group ID
                                 # duplication, default: false
-  notifies                   # see description
+  notifies                   # :action, 'resource[name]', :timer
   provider                   Chef::Provider::Group
-  subscribes                 # see description
+  subscribes                 # :action, 'resource[name]', :timer
   system                     TrueClass, FalseClass  # show if a group
                                 # belongs to a system group
   action                     Symbol # default: :create if not specified
@@ -239,5 +239,240 @@ group 'www-data' do
   action :modify
   members ['maintenance', 'writers']
   append true
+end
+```
+
+
+## `link` resource
+
+The [`link` resource](https://docs.chef.io/resource_link.html) lets us
+define symbolic or hard links to files or directories. Remember, hard
+links must refer to a file on the same file system as the file being
+linked to, and it does not work with directories. By default, it creates
+symbolic links, which can link to files or directories on same or
+different file system.
+
+```ruby
+link 'name' do
+  group                      Integer, String  # group name or ID
+  link_type                  Symbol # `:symbolic` (default), `:hard`
+  mode                       Integer, String  # 0755, 0400, etc.
+  notifies                   # :action, 'resource[name]', :timer
+  owner                      Integer, String  # user name or ID
+  provider                   Chef::Provider::Link
+  subscribes                 # :action, 'resource[name]', :timer
+  target_file                String # default: 'name' if not specified
+  to                         String # link source (what we link to)
+  action                     Symbol # default: :create if not specified
+end
+```
+
+- Action can be one of: `:create` (default, creates or updates a link),
+  `:delete`, `:nothing`
+- Create a symbolic link:
+```ruby
+link '/tmp/file' do
+  to '/etc/file'
+end
+```
+- Create a hard link:
+```ruby
+link '/tmp/file' do
+  to '/etc/file'
+  link_type :hard
+end
+```
+- Delete a link only if it is symbolic:
+```ruby
+link '/tmp/file' do
+  action :delete
+  only_if 'test -L /tmp/file'
+end
+```
+- Create platform-specific symbolic links, depending on distribution:
+```ruby
+include_recipe 'apache2::default'
+
+case node['platform_family']
+when 'debian'
+  ...
+when 'suse'
+  ...
+when 'rhel', 'fedora'
+  ...
+
+  link '/usr/lib64/httpd/modules/mod_apreq.so' do
+    to      '/usr/lib64/httpd/modules/mod_apreq2.so'
+    only_if 'test -f /usr/lib64/httpd/modules/mod_apreq2.so'
+  end
+
+  link '/usr/lib/httpd/modules/mod_apreq.so' do
+    to      '/usr/lib/httpd/modules/mod_apreq2.so'
+    only_if 'test -f /usr/lib/httpd/modules/mod_apreq2.so'
+  end
+end
+```
+
+
+## `package` resource
+
+The [`package` resource](https://docs.chef.io/resource_package.html)
+lets us manage packages on the node, including their installation,
+upgrade, and removal.
+
+```ruby
+package 'name' do
+  allow_downgrade            TrueClass, FalseClass # Yum, RPM packages
+                                # only, default: false
+  arch                       String, Array # Yum packages only
+  default_release            String # Apt packages only (e.g. stable)
+  flush_cache                Array  # [ :before, :after ]
+  gem_binary                 String # Ruby gems only
+  homebrew_user              String, Integer # Homebrew packages only
+  notifies                   # :action, 'resource[name]', :timer
+  options                    String # one or more options passed to the command
+  package_name               String, Array # default: 'name' if not specified
+                                # it can be an array of package names
+  provider                   Chef::Provider::Package
+  response_file              String # Apt packages only
+  response_file_variables    Hash # Apt packages only
+  source                     String # path to package in file system
+  subscribes                 # :action, 'resource[name]', :timer
+  timeout                    String, Integer
+  version                    String, Array  # package(s)'s version to install 
+  action                     Symbol # default: :install if not specified
+end
+```
+
+- Action can be one of: `:install` (default), `:nothing`, `:purge`
+  (Debian and Ubuntu only, remove package and its configuration files),
+  `:reconfig` (requires a `response_file`), `:remove`, `:upgrade`
+- Install a package:
+```ruby
+package 'apache2'
+```
+- Install a package, depending on distribution:
+```ruby
+package 'Install Apache' do
+  case node[:platform]
+  when 'redhat', 'centos'
+    package_name 'httpd'
+  when 'ubuntu', 'debian'
+    package_name 'apache2'
+  end
+end
+```
+- Install the [Bundler Ruby gem](http://rubygems.rubyforge.org/
+rubygems-update/Gem/DependencyInstaller.html):
+```ruby
+gem_package 'bundler' do
+  options(:prerelease => true, :format_executable => false)
+end
+```
+- Upgrading multiple packages:
+```ruby
+package ['package1', 'package2']  do
+  action :upgrade
+end
+```
+- Purging multiple packages:
+```ruby
+package ['package1', 'package2']  do
+  action :purge
+end
+```
+- Notifications:
+```ruby
+package ['package1', 'package2']  do
+  action :nothing
+end
+
+log 'call a notification' do
+  notifies :install, 'package[package1, package2]', :immediately
+end
+```
+- Install gem file from local file system:
+```ruby
+gem_package 'right_aws' do
+  source '/tmp/right_aws-1.11.0.gem'
+  action :install
+end
+```
+- Install packages with specific versions:
+```ruby
+package 'tar' do
+  version '1.16.1-1'
+  action :install
+end
+
+package 'mysql-server' do
+  version node['mysql']['version']
+  action :install
+end
+```
+- Install a package with options:
+```ruby
+package 'debian-archive-keyring' do
+  action :install
+  options '--force-yes'
+end
+```
+- Install `sudo` and configure `/etc/sudoers`:
+```ruby
+
+package 'sudo' do
+  action :install
+end
+
+if node['authorization']['sudo']['include_sudoers_d']
+  directory '/etc/sudoers.d' do
+    mode        '0755'
+    owner       'root'
+    group       'root'
+    action      :create
+  end
+
+  cookbook_file '/etc/sudoers.d/README' do
+    source      'README'
+    mode        '0440'
+    owner       'root'
+    group       'root'
+    action      :create
+  end
+end
+
+template '/etc/sudoers' do
+  source 'sudoers.erb'
+  mode '0440'
+  owner 'root'
+  group platform?('freebsd') ? 'wheel' : 'root'
+  variables(
+    :sudoers_groups => node['authorization']['sudo']['groups'],
+    :sudoers_users => node['authorization']['sudo']['users'],
+    :passwordless => node['authorization']['sudo']['passwordless']
+  )
+end
+```
+- Use `case` statement to specify platform:
+```ruby
+package 'curl'
+  case node[:platform]
+  when 'redhat', 'centos'
+    package 'package_1'
+    package 'package_2'
+    package 'package_3'
+  when 'ubuntu', 'debian'
+    package 'package_a'
+    package 'package_b'
+    package 'package_c'
+  end
+end
+```
+- Use array to specify an action on several packages at once:
+```ruby
+%w{package-a package-b package-c package-d}.each do |pkg|
+  package pkg do
+    action :upgrade
+  end
 end
 ```
