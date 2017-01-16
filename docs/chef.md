@@ -1,10 +1,11 @@
 # Chef
 
 Chef is a configuration management tool written in Ruby and Erlang. It
-uses a pure-Ruby, domain-specific language (DSL) for writing system configuration "recipes".
+uses a pure-Ruby, domain-specific language (DSL) for writing system
+configuration "recipes".
 
 
-## Installing
+## Installation
 Chef client:
 ```sh
 $ curl -L https://omnitruck.chef.io/install.sh | sudo bash
@@ -19,8 +20,8 @@ $ curl -L https://omnitruck.chef.io/install.sh | sudo bash -s -- \
 
 ## Usage
 
-- Chef updates what is necessary and changed, and makes sure it gets to
-  a consistent state defined in the recipes - *set and forget* principle
+- Chef updates what has changed, and makes sure it gets to a consistent
+  state defined in the recipes - *test and repair*
 - Run a recipe: `chef-client --local-mode hello.rb`
 - Another way: `chef-apply recipe.rb`
 - `chef-solo` executes `chef-client` in a way that does not require
@@ -53,6 +54,20 @@ $ curl -L https://omnitruck.chef.io/install.sh | sudo bash -s -- \
   - environments, cloud resources (including provisioning)
   - installation of `chef-client` on management workstations
   - searching of indexed data on the Chef server
+
+
+## Recipes
+
+[Recipe](https://docs.chef.io/recipes.html) is a Ruby file that
+represents a collection of resources, used to define everything that is
+required to configure a part of a system.
+It must be stored in a cookbook, may be included in another recipe, may
+depend on one or more recipes, must be added to a run list before
+running `chef-client`, and is always executed in the same order as is
+listed in a runlist.
+
+- Including a recipe: `include_recipe 'recipe'`
+- Assign a dependency to a recipe: `depends 'apache2'`
 
 
 ## `file` resource
