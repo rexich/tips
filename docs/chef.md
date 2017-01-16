@@ -86,8 +86,7 @@ end
 ```
 - Actions can be one of: `:create` (default), `:create_if_missing`,
   `:delete`, `:nothing`, `:touch`
-- Examples:
-  - Create a file:
+- Create a file:
 ```ruby
 file '/tmp/something' do
   owner 'root'
@@ -96,35 +95,38 @@ file '/tmp/something' do
   action :create
 end
 ```
-  - Delete a file:
+- Delete a file:
 ```ruby
 file '/tmp/something' do
   action :delete
 end
 
 ```
-  - Set file modes:
+- Set file modes:
 ```ruby
 file '/tmp/something' do
   mode '0755'
 end
 ```
-  - Delete a repository using yum to scrub the cache
+- Delete a repository and use apt-get to clean cache and update lists:
 ```ruby
-# the following code sample thanks to gaffneyc @ https://gist.github.com/918711
-
-execute 'clean-yum-cache' do
-  command 'yum clean all'
+execute 'clean-apt-cache' do
+  command 'apt-get clean'
   action :nothing
 end
 
-file '/etc/yum.repos.d/bad.repo' do
+execute 'apt-get-update' do
+  command 'apt-get update'
+  action :nothing
+end
+
+file '/etc/apt/sources.list.d/unnecessary-repo.list' do
   action :delete
-  notifies :run, 'execute[clean-yum-cache]', :immediately
-  notifies :create, 'ruby_block[reload-internal-yum-cache]', :immediately
+  notifies :run, 'execute[clean-apt-cache]', :immediately
+  notifies :run, 'execute[apt-get-update], :immediately
 end
 ```
-  - Write a string to a file:
+- Write a string to a file:
 ```ruby
 status_file = '/path/to/file/status_file'
 
@@ -132,13 +134,13 @@ file status_file do
   owner 'root'
   group 'root'
   mode '0755'
-  content 'My favourite foremost coastal Antarctic shelf, oh Larsen B!'
+  content 'Nyan-cat is omnipresent in space :3'
 end
 ```
-  - Create a file from a copy:
+- Create a file from a copy:
 ```ruby
-file '/root/1.txt' do
-  content IO.read('/tmp/1.txt')
+file '/root/lol.txt' do
+  content IO.read('/tmp/lol.txt')
   action :create
 end
 ```
