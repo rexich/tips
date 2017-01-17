@@ -85,6 +85,176 @@ Resources can generate a file, install a package, configure a service.
 All resources have actions, and if an action is not given, usually the
 default (more permissive) action is performed.
 
+Resources have a name, a type, parameter attributes, and an action.
+
+
+## Cookbooks
+
+A [cookbook](https://docs.chef.io/cookbooks.html) is the fundamental
+unit of configuration and policy distribution. In essence, it defines
+a scenario and contains all things required to support the screnario,
+such as: recipes, attribute values, templates, extensions (libraries).
+
+- Generate a cookbook:
+```sh
+$ mkdir cookbooks
+$ chef generate cookbook cookbooks/apache2
+```
+- Generate a template:
+```sh
+$ chef generate template cookbooks/apache2 index.html
+```
+- Run a cookbook locally on the running node:
+```sh
+$ sudo chef-client --local-mode --runlist 'recipe[learn_chef_apache2]'
+$ sudo chef-client --local-mode --runlist 'recipe[lol::default]'
+```
+- Upload cookbook to Chef server and list them on server:
+```sh
+$ knife cookbook upload le_cookbooke
+$ knife cookbook list
+```
+- Bootstrapping a node means installing `chef-client` on it and checking
+  it in with the Chef server for the first time:
+```sh
+$ knife bootstrap localhost --ssh-port 2222 --ssh-user vagrant --sudo --identity-file /root/learn-chef/chef-server/.vagrant/machines/node1-ubuntu/virtualbox/private_key --node-name node1-ubuntu --run-list 'recipe[learn_chef_apache2]'
+```
+- List all nodes associated with the Chef server:
+```sh
+$ knife node list
+```
+- View data about a node:
+```sh
+$ knife node show node_name
+```
+- On each change of functionality (the recipes) of your cookbook, you
+ need to increase the version number in the `metadata.rb` file and
+ upload the cookbook again on the Chef server:
+```sh
+$ knife cookbook upload le_cookbooke
+```
+- Then, run Chef client on the node again to apply new configuration:
+```sh
+$ knife ssh localhost --ssh-port 2222 'sudo chef-client' --manual-list --ssh-user vagrant --identity-file chef-server/.vagrant/machines/node1-ubuntu/virtualbox/private_key
+```
+- In practice, `chef-client` is set up to run periodically and get new
+  configuration data from the Chef server
+
+
+- Getting cookbooks and their dependencies from the supermarket is done
+  by writing a Berksfile in the project's top directory and provide a
+  source URL and the names of the cookbooks to be installed:
+```ruby
+source 'https://supermarket.chef.io'
+cookbook 'chef-client'
+```
+- Afterwards, tell Berks to fetch the cookbooks and their dependencies
+  and store them locally on your workstation:
+```sh
+$ berks install
+```
+- Then, we use Berks to upload all of the cookbooks to our Chef server,
+  instead of using Knife to upload them one-by-one:
+```sh
+$ SSL_CERT_FILE='.chef/trusted_certs/chef-server_test.crt' berks upload
+```
+- You must provide the `SSL_CERT_FILE` environmental variable with the
+  path to the Chef server's SSL certificate, so the connection can be
+  eastablished and encrypted
+
+- Delete node data from Chef server:
+```sh
+$ knife node delete node1-ubuntu --yes
+```
+- Delete node client connection from Chef server:
+```sh
+$ knife client delete node1-ubuntu --yes
+```
+- Delete cookbook from Chef server:
+```sh
+$ knife cookbook delete learn_chef_apache2 --all --yes
+```
+- Delete role from Chef server:
+```sh
+$ knife role delete web --yes
+```
+- Delete RSA private key from your node - log into the node first:
+```sh
+$ sudo rm /etc/chef/client.pem
+```
+
+
+## Roles
+
+[Roles](https://docs.chef.io/roles.html) are a way to define certain
+patterns and processes that exist across nodes in an organization and
+that belong to a single job function, like: web server, backup server,
+file server, etc.
+
+Each role contains zero or more attributes and a run-list, and each node
+can have zero or more roles assigned to it. The attributes a role has
+can either be `default` or `override`, and the role's attributes are
+compared to the node's ones, and change the node's attributes if needed.
+
+At the beginning of a `chef-client` run, all attributes are reset, and
+rebuilds them using automatic attributes provided by Ohai at the start
+of the run, and then it uses `default` and `override` attributes
+specified in cookbooks or by roles and environments.
+
+Normal attributes are never reset. All attributes are then merged and
+applied to the node according to attribute precedence. When `chef-
+client` finishes its run, the attributes that were applied to the node
+are saved to the Chef server as part of the node object.
+
+- A role file written in JSON:
+```json
+{
+   "name": "web",
+   "description": "Web server role.",
+   "json_class": "Chef::Role",
+   "default_attributes": {
+     "chef_client": {
+       "interval": 300,
+       "splay": 60
+     }
+   },
+   "override_attributes": {
+   },
+   "chef_type": "role",
+   "run_list": ["recipe[chef-client::default]",
+                "recipe[chef-client::delete_validation]",
+                "recipe[learn_chef_apache2::default]"
+   ],
+   "env_run_lists": {
+   }
+}
+```
+- Upload role to the Cher server and list all to see if it got there:
+```sh
+$ knife role from file roles/web.json
+$ knife role list
+```
+- Show role's details:
+```sh
+$ knife role show web
+```
+- Set the node's run-list to the ones provided by the role, and see the
+  run list on the node to check if everything is set properly:
+```sh
+$ knife node run_list set node1-ubuntu "role[web]"
+$ knife node show node1-ubuntu --run-list
+```
+- Then, run Chef client on the node again to apply new configuration:
+```sh
+$ knife ssh localhost --ssh-port 2222 'sudo chef-client' --manual-list --ssh-user vagrant --identity-file chef-server/.vagrant/machines/node1-ubuntu/virtualbox/private_key
+```
+- Get a brief summary of the nodes on the Chef server and the most
+  recent successful run of `chef-client`:
+```sh
+$ knife status 'role:web' --run-list
+```
+
+
 
 ## `file` resource
 
