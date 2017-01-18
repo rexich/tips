@@ -124,18 +124,109 @@ converge cookbooks, in a so-called 'local mode'.
 
 You can also use `chef-client` in 'local mode' to run individual recipes
 without contacting the Chef server: `chef-client --local-mode hello.rb`;
-or you simply run `chef-apply recipe.rb`, but has no support templates.
+or you simply run `chef-apply recipe.rb`, but it does not support
+templates at all.
 
 
 ## `knife` management tool
-The [`knife`](https://docs.chef.io/knife.html) utility provides an
+The [Knife](https://docs.chef.io/knife.html) utility provides an
 interface between local chef-repo and the Chef server. It is frequently
 used to manage the following:
+
 - nodes, cookbooks, recipes, roles
 - data bags (stores of JSON data, including encrypted ones)
 - environments, cloud resources (including provisioning)
 - installation of `chef-client` on management workstations
 - searching of indexed data on the Chef server
+
+Knife is a versatile tool with plenty of uses:
+
+- Bootstrapping a node means installing `chef-client` on it and checking
+  it in with the Chef server for the first time, and that is performed
+  using `knife` over a SSH connection:
+```sh
+$ knife bootstrap localhost --ssh-port 2222 --ssh-user vagrant --sudo --identity-file chef-server/.vagrant/machines/node1-ubuntu/virtualbox/private_key --node-name node1-ubuntu --run-list 'recipe[learn_chef_apache2]'
+```
+- List all nodes associated with the Chef server:
+```sh
+$ knife node list
+```
+- View information about a node:
+```sh
+$ knife node show node_name
+```
+- On each change of functionality (recipes) of your cookbook, you need
+ to increase the version number in the `metadata.rb` file and upload
+ the cookbook again on the Chef server:
+```sh
+$ knife cookbook upload le_cookbooke
+```
+- Then, run Chef client on the node again to apply new configuration:
+```sh
+$ knife ssh localhost --ssh-port 2222 'sudo chef-client' --manual-list --ssh-user vagrant --identity-file chef-server/.vagrant/machines/node1-ubuntu/virtualbox/private_key
+```
+
+In practice, `chef-client` is set up to run periodically and get new
+configuration data from the Chef server; refer to the example in Roles.
+
+Deleting data from the Chef server is performed like this:
+
+- Delete node data from Chef server:
+```sh
+$ knife node delete node1-ubuntu --yes
+```
+- Delete node client connection from Chef server:
+```sh
+$ knife client delete node1-ubuntu --yes
+```
+- Delete cookbook from Chef server:
+```sh
+$ knife cookbook delete learn_chef_apache2 --all --yes
+```
+- Delete role from Chef server:
+```sh
+$ knife role delete web --yes
+```
+- Delete RSA private key from your node - log into the node first:
+```sh
+$ sudo rm /etc/chef/client.pem
+```
+
+
+## `berks` cookbook manager
+
+[Berkshelf](https://docs.chef.io/berkshelf.html) is a dependency manager
+for Chef cookbooks. It lets the user specify the cookbooks their project
+needs, and will automatically resolve which cookbooks depend on the
+specified ones and download them all. Afterwards, they can be uploaded
+in bulk to the Chef server, instead of one-by-one using `knife`.
+
+Getting cookbooks and their dependencies from the supermarket is done
+by writing a Berksfile in the project's top directory and provide a
+source URL and the names of the cookbooks to be installed:
+
+```ruby
+source 'https://supermarket.chef.io'
+cookbook 'chef-client'
+```
+
+Afterwards, tell Berks to fetch the cookbooks and their dependencies
+and store them locally on your workstation:
+
+```sh
+$ berks install
+```
+
+Then we use Berks to upload all of the cookbooks to our Chef server,
+instead of using Knife to upload them one-by-one:
+
+```sh
+$ SSL_CERT_FILE='.chef/trusted_certs/chef-server_test.crt' berks upload
+```
+
+You must provide the `SSL_CERT_FILE` environmental variable with the
+path to the Chef server's SSL certificate, so the connection can be
+eastablished successfully.
 
 
 ## Recipes
@@ -205,74 +296,6 @@ $ sudo chef-client --local-mode --runlist 'recipe[lol::default]'
 $ knife cookbook upload le_cookbooke
 $ knife cookbook list
 ```
-- Bootstrapping a node means installing `chef-client` on it and checking
-  it in with the Chef server for the first time:
-```sh
-$ knife bootstrap localhost --ssh-port 2222 --ssh-user vagrant --sudo --identity-file /root/learn-chef/chef-server/.vagrant/machines/node1-ubuntu/virtualbox/private_key --node-name node1-ubuntu --run-list 'recipe[learn_chef_apache2]'
-```
-- List all nodes associated with the Chef server:
-```sh
-$ knife node list
-```
-- View data about a node:
-```sh
-$ knife node show node_name
-```
-- On each change of functionality (the recipes) of your cookbook, you
- need to increase the version number in the `metadata.rb` file and
- upload the cookbook again on the Chef server:
-```sh
-$ knife cookbook upload le_cookbooke
-```
-- Then, run Chef client on the node again to apply new configuration:
-```sh
-$ knife ssh localhost --ssh-port 2222 'sudo chef-client' --manual-list --ssh-user vagrant --identity-file chef-server/.vagrant/machines/node1-ubuntu/virtualbox/private_key
-```
-- In practice, `chef-client` is set up to run periodically and get new
-  configuration data from the Chef server
-
-
-- Getting cookbooks and their dependencies from the supermarket is done
-  by writing a Berksfile in the project's top directory and provide a
-  source URL and the names of the cookbooks to be installed:
-```ruby
-source 'https://supermarket.chef.io'
-cookbook 'chef-client'
-```
-- Afterwards, tell Berks to fetch the cookbooks and their dependencies
-  and store them locally on your workstation:
-```sh
-$ berks install
-```
-- Then, we use Berks to upload all of the cookbooks to our Chef server,
-  instead of using Knife to upload them one-by-one:
-```sh
-$ SSL_CERT_FILE='.chef/trusted_certs/chef-server_test.crt' berks upload
-```
-- You must provide the `SSL_CERT_FILE` environmental variable with the
-  path to the Chef server's SSL certificate, so the connection can be
-  eastablished and encrypted
-
-- Delete node data from Chef server:
-```sh
-$ knife node delete node1-ubuntu --yes
-```
-- Delete node client connection from Chef server:
-```sh
-$ knife client delete node1-ubuntu --yes
-```
-- Delete cookbook from Chef server:
-```sh
-$ knife cookbook delete learn_chef_apache2 --all --yes
-```
-- Delete role from Chef server:
-```sh
-$ knife role delete web --yes
-```
-- Delete RSA private key from your node - log into the node first:
-```sh
-$ sudo rm /etc/chef/client.pem
-```
 
 
 ## Roles
@@ -297,7 +320,8 @@ applied to the node according to attribute precedence. When `chef-
 client` finishes its run, the attributes that were applied to the node
 are saved to the Chef server as part of the node object.
 
-- A role file written in JSON:
+- A role file written in JSON, that tells `chef-client` to connect to
+  the server every 5-6 minutes and reload the cookbooks:
 ```json
 {
    "name": "web",
@@ -343,6 +367,26 @@ $ knife ssh localhost --ssh-port 2222 'sudo chef-client' --manual-list --ssh-use
   recent successful run of `chef-client`:
 ```sh
 $ knife status 'role:web' --run-list
+```
+- Example of a role with different run-lists for different environments:
+```json
+{
+  "name": "webserver",
+  "default_attributes": {
+  },
+  "json_class": "Chef::Role",
+  "env_run_lists": {
+    "production": [],
+    "preprod": [],
+    "test": [ "role[base]", "recipe[apache]", "recipe[apache::copy_test_configs]" ],
+    "dev": [ "role[base]", "recipe[apache]", "recipe[apache::copy_dev_configs]" ]
+    },
+  "run_list": [ "role[base]", "recipe[apache]" ],
+  "description": "The webserver role",
+  "chef_type": "role",
+  "override_attributes": {
+  }
+}
 ```
 
 
