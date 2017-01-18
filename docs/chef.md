@@ -1,4 +1,4 @@
-# Chef
+# Chef 101: Learning Server Provision with Chef
 
 Chef is a configuration management tool written in Ruby and Erlang. It
 uses a pure-Ruby, domain-specific language (DSL) for writing system
@@ -18,42 +18,215 @@ $ curl -L https://omnitruck.chef.io/install.sh | sudo bash -s -- \
 ```
 
 
-## Usage
+## Nodes and Attributes
 
-- Chef updates what has changed, and makes sure it gets to a consistent
-  state defined in the recipes - *test and repair*
-- Run a recipe: `chef-client --local-mode hello.rb`
-- Another way: `chef-apply recipe.rb`
-- `chef-solo` executes `chef-client` in a way that does not require
-  Chef server to converge cookbooks, runs in local mode, has no
-  centralized distribution of cookbooks or API, no authentication, no
-  authorization, can be run as a daemon
-  `chef-solo -c ~/chef/solo.rb`
-- [Chef-solo](https://docs.chef.io/chef_solo.html) has `solo.rb` as its
-  [configuration file](https://docs.chef.io/config_rb_solo.html), where
-  you can set paths and recipes to run
-- `chef-client` is [an agent](https://docs.chef.io/chef_client.html)
-  that runs locally on every node managed by Chef, when it is run it
-  will perform all steps required to bring a node to the expected state:
-  - registering and authenticating it with the Chef server
-  - building the node object
-  - synchronizing cookbooks
-  - compiling resource collection by loading each cookbook, recipe,
-    attribute, all dependencies
-  - taking appropriate actions to configure the node
-  - looking for exceptions and notifications, handling them as required
-- RSA public key-pairs are used to authenticate the chef-client with
-  the Chef server every time the client needs to access data stored on
-  the server
-- Ohai detects attributes on the node and provides them to `chef-client`
-  at the start of every client's run
-- `knife` is [a tool](https://docs.chef.io/knife.html) that provides an
-  interface between local chef-repo and the Chef server, used to manage:
-  - nodes, cookbooks, recipes, roles
-  - data bags (stores of JSON data, including encrypted ones)
-  - environments, cloud resources (including provisioning)
-  - installation of `chef-client` on management workstations
-  - searching of indexed data on the Chef server
+A [node](https://docs.chef.io/nodes.html) represents a machine managed
+by Chef, such as: server, cloud instance, virtual machine, network
+device, or virtualized container.
+
+Each node is bootstrapped the first time and will have `chef-client`
+installed and the Chef server certificate provided and stored for safe
+communication and authentication
+
+Each node's specific details are gathered by Ohai at each `chef-client`
+run and provided as [attributes](https://docs.chef.io/attributes.html),
+such as an IP address, kernel version, list of loaded kernel modules,
+and so on. They can also be set and modified from the defaults in a
+cookbook, recipes, roles, and environments. Attributes lists are built
+from Ohai data, the node object stored on Chef server, and the updated
+generated node object from the current `chef-client` run.
+
+Attributes can be defined in the `attributes/` subfolder of a cookbook,
+the default one being `default.rb`. Writing `node` is unnecessary since
+it is implicitly referred to.
+
+```ruby
+node.default['apache']['dir']          = '/etc/apache2'
+node.default['apache']['listen_ports'] = [ '80','443' ]
+```
+
+Most frequently used attributes include:
+
+- `node['platform']` - platform on which a node is running, helps\
+  determine which providers will be used
+- `node['platform_version']` - version of the platform
+- `node['ipaddress']` - IP address for a node; if the node has a default
+  route, this is the IPv4 address for the interface, otherwise the value
+  should be nil; recommended value: the IP address for default route
+- `node['macaddress']` - MAC address for a node, determined by the same
+  interface that detects the `node['ipaddress']`
+- `node['fqdn']` - fully qualified domain name for a node, used as the
+  name of a node unless otherwise set
+- `node['hostname']` - host name for the node
+- `node['domain']` - domain for the node
+- `node['recipes']` - a list of recipes associated with a node (and part
+  of that node's run-list)
+- `node['roles']`  - a list of roles associated with a node (and part of
+  that node's run-list)
+- `node['ohai_time']` - time at which Ohai was last run; not commonly
+  used in recipes, but it is saved to the Chef server and can be
+  accessed using the `knife status` subcommand
+
+Use method `attribute?('attr_name')` to check whether attribute is
+defined and exists, useful for `if` conditionals.
+
+Nodes can be managed using several available utilities:
+
+- `knife` can be used to create, edit, view, list, tag, and delete nodes
+- knife plug-ins can be used to create, edit, and manage nodes that are
+  located on cloud providers
+- `chef-client` can be used to manage node data using the command line
+  and JSON files; each JSON file contains a hash, the elements of which
+  are added as node attributes; also, the run_list setting allows roles
+  and/or recipes to be added to the node
+- `chef-solo` can be used to manage node data using the command line and
+  JSON files; each JSON file contains a hash, the elements of which are
+  added as node attributes; also, the run_list setting allows roles
+  and/or recipes to be added to the node
+- The command line can also be used to edit JSON files and files that
+  are related to third-party services, such as Amazon EC2, where the
+  JSON files can contain per-instance metadata that is stored in a file
+ on-disk and then read by chef-solo or chef-client as required
+
+
+## `chef-client` and `chef-solo`
+
+The `chef-client` is [an agent](https://docs.chef.io/chef_client.html)
+that runs locally on every node managed by Chef server, and once it is
+run it will perform all steps required to bring a node to the expected
+state, and will skip configuring what is already in the wanted state
+(*test and repair* method). It handles the following:
+
+- registering and authenticating a node with the Chef server
+- building the node object
+- synchronizing cookbooks
+- compiling resource collection by loading each cookbook, recipe,
+  attribute, and all dependencies
+- taking appropriate actions to configure the node
+- looking for exceptions and notifications, handling them as required
+
+RSA public key-pairs are used to authenticate the chef-client with Chef
+server every time the client needs to access data stored on the server.
+
+Ohai detects attributes on the node and provides them to `chef-client`
+at the start of every client's run.
+
+The [`chef-solo`](https://docs.chef.io/chef_solo.html) tool can be used
+to run `chef-client` in a way that does not require a Chef server to
+converge cookbooks, in a so-called 'local mode'.
+
+- `chef-solo` has no centralized distribution of cookbooks or API
+- It lacks authentication and authorizatio
+- Can be run as a daemon
+- Use its [configuration file](https://docs.chef.io/config_rb_solo.html)
+  `solo.rb` to set paths and recipes to run
+- Usage: `chef-solo -c ~/chef/solo.rb`
+
+You can also use `chef-client` in 'local mode' to run individual recipes
+without contacting the Chef server: `chef-client --local-mode hello.rb`;
+or you simply run `chef-apply recipe.rb`, but it does not support
+templates at all.
+
+
+## `knife` management tool
+The [Knife](https://docs.chef.io/knife.html) utility provides an
+interface between local chef-repo and the Chef server. It is frequently
+used to manage the following:
+
+- nodes, cookbooks, recipes, roles
+- data bags (stores of JSON data, including encrypted ones)
+- environments, cloud resources (including provisioning)
+- installation of `chef-client` on management workstations
+- searching of indexed data on the Chef server
+
+Knife is a versatile tool with plenty of uses:
+
+- Bootstrapping a node means installing `chef-client` on it and checking
+  it in with the Chef server for the first time, and that is performed
+  using `knife` over a SSH connection:
+```sh
+$ knife bootstrap localhost --ssh-port 2222 --ssh-user vagrant --sudo --identity-file chef-server/.vagrant/machines/node1-ubuntu/virtualbox/private_key --node-name node1-ubuntu --run-list 'recipe[learn_chef_apache2]'
+```
+- List all nodes associated with the Chef server:
+```sh
+$ knife node list
+```
+- View information about a node:
+```sh
+$ knife node show node_name
+```
+- On each change of functionality (recipes) of your cookbook, you need
+ to increase the version number in the `metadata.rb` file and upload
+ the cookbook again on the Chef server:
+```sh
+$ knife cookbook upload le_cookbooke
+```
+- Then, run Chef client on the node again to apply new configuration:
+```sh
+$ knife ssh localhost --ssh-port 2222 'sudo chef-client' --manual-list --ssh-user vagrant --identity-file chef-server/.vagrant/machines/node1-ubuntu/virtualbox/private_key
+```
+
+In practice, `chef-client` is set up to run periodically and get new
+configuration data from the Chef server; refer to the example in Roles.
+
+Deleting data from the Chef server is performed like this:
+
+- Delete node data from Chef server:
+```sh
+$ knife node delete node1-ubuntu --yes
+```
+- Delete node client connection from Chef server:
+```sh
+$ knife client delete node1-ubuntu --yes
+```
+- Delete cookbook from Chef server:
+```sh
+$ knife cookbook delete learn_chef_apache2 --all --yes
+```
+- Delete role from Chef server:
+```sh
+$ knife role delete web --yes
+```
+- Delete RSA private key from your node - log into the node first:
+```sh
+$ sudo rm /etc/chef/client.pem
+```
+
+
+## `berks` cookbook manager
+
+[Berkshelf](https://docs.chef.io/berkshelf.html) is a dependency manager
+for Chef cookbooks. It lets the user specify the cookbooks their project
+needs, and will automatically resolve which cookbooks depend on the
+specified ones and download them all. Afterwards, they can be uploaded
+in bulk to the Chef server, instead of one-by-one using `knife`.
+
+Getting cookbooks and their dependencies from the supermarket is done
+by writing a Berksfile in the project's top directory and provide a
+source URL and the names of the cookbooks to be installed:
+
+```ruby
+source 'https://supermarket.chef.io'
+cookbook 'chef-client'
+```
+
+Afterwards, tell Berks to fetch the cookbooks and their dependencies
+and store them locally on your workstation:
+
+```sh
+$ berks install
+```
+
+Then we use Berks to upload all of the cookbooks to our Chef server,
+instead of using Knife to upload them one-by-one:
+
+```sh
+$ SSL_CERT_FILE='.chef/trusted_certs/chef-server_test.crt' berks upload
+```
+
+You must provide the `SSL_CERT_FILE` environmental variable with the
+path to the Chef server's SSL certificate, so the connection can be
+eastablished successfully.
 
 
 ## Recipes
@@ -61,11 +234,14 @@ $ curl -L https://omnitruck.chef.io/install.sh | sudo bash -s -- \
 A [recipe](https://docs.chef.io/recipes.html) is a Ruby file that
 represents a collection of resources, used to define everything that is
 required to configure a part of a system. In other words, it is an
-ordered series of configuration states.
+ordered series of configuration states, and is the most fundamental
+configuration element within an organization.
+
 It must be stored in a cookbook, may be included in another recipe, may
 depend on one or more recipes, must be added to a run list before
 running `chef-client`, and is always executed in the same order as is
-listed in a runlist.
+listed in a runlist. You can add helper code in it, since it is a Ruby
+program.
 
 - Including a recipe: `include_recipe 'recipe'`
 - Assign a dependency to a recipe: `depends 'apache2'`
@@ -95,6 +271,12 @@ unit of configuration and policy distribution. In essence, it defines
 a scenario and contains all things required to support the screnario,
 such as: recipes, attribute values, templates, extensions (libraries).
 
+Cookbooks help us stay organized by adding structure to our work and by
+grouping recipes. Default cookbook settings are kept in `default.rb` and
+are loaded first, and then other configuration files are loaded in
+alphabetical order, and can override settings in this file.
+
+
 - Generate a cookbook:
 ```sh
 $ mkdir cookbooks
@@ -113,74 +295,6 @@ $ sudo chef-client --local-mode --runlist 'recipe[lol::default]'
 ```sh
 $ knife cookbook upload le_cookbooke
 $ knife cookbook list
-```
-- Bootstrapping a node means installing `chef-client` on it and checking
-  it in with the Chef server for the first time:
-```sh
-$ knife bootstrap localhost --ssh-port 2222 --ssh-user vagrant --sudo --identity-file /root/learn-chef/chef-server/.vagrant/machines/node1-ubuntu/virtualbox/private_key --node-name node1-ubuntu --run-list 'recipe[learn_chef_apache2]'
-```
-- List all nodes associated with the Chef server:
-```sh
-$ knife node list
-```
-- View data about a node:
-```sh
-$ knife node show node_name
-```
-- On each change of functionality (the recipes) of your cookbook, you
- need to increase the version number in the `metadata.rb` file and
- upload the cookbook again on the Chef server:
-```sh
-$ knife cookbook upload le_cookbooke
-```
-- Then, run Chef client on the node again to apply new configuration:
-```sh
-$ knife ssh localhost --ssh-port 2222 'sudo chef-client' --manual-list --ssh-user vagrant --identity-file chef-server/.vagrant/machines/node1-ubuntu/virtualbox/private_key
-```
-- In practice, `chef-client` is set up to run periodically and get new
-  configuration data from the Chef server
-
-
-- Getting cookbooks and their dependencies from the supermarket is done
-  by writing a Berksfile in the project's top directory and provide a
-  source URL and the names of the cookbooks to be installed:
-```ruby
-source 'https://supermarket.chef.io'
-cookbook 'chef-client'
-```
-- Afterwards, tell Berks to fetch the cookbooks and their dependencies
-  and store them locally on your workstation:
-```sh
-$ berks install
-```
-- Then, we use Berks to upload all of the cookbooks to our Chef server,
-  instead of using Knife to upload them one-by-one:
-```sh
-$ SSL_CERT_FILE='.chef/trusted_certs/chef-server_test.crt' berks upload
-```
-- You must provide the `SSL_CERT_FILE` environmental variable with the
-  path to the Chef server's SSL certificate, so the connection can be
-  eastablished and encrypted
-
-- Delete node data from Chef server:
-```sh
-$ knife node delete node1-ubuntu --yes
-```
-- Delete node client connection from Chef server:
-```sh
-$ knife client delete node1-ubuntu --yes
-```
-- Delete cookbook from Chef server:
-```sh
-$ knife cookbook delete learn_chef_apache2 --all --yes
-```
-- Delete role from Chef server:
-```sh
-$ knife role delete web --yes
-```
-- Delete RSA private key from your node - log into the node first:
-```sh
-$ sudo rm /etc/chef/client.pem
 ```
 
 
@@ -206,7 +320,8 @@ applied to the node according to attribute precedence. When `chef-
 client` finishes its run, the attributes that were applied to the node
 are saved to the Chef server as part of the node object.
 
-- A role file written in JSON:
+- A role file written in JSON, that tells `chef-client` to connect to
+  the server every 5-6 minutes and reload the cookbooks:
 ```json
 {
    "name": "web",
@@ -253,7 +368,84 @@ $ knife ssh localhost --ssh-port 2222 'sudo chef-client' --manual-list --ssh-use
 ```sh
 $ knife status 'role:web' --run-list
 ```
+- Example of a role with different run-lists for different environments:
+```json
+{
+  "name": "webserver",
+  "default_attributes": {
+  },
+  "json_class": "Chef::Role",
+  "env_run_lists": {
+    "production": [],
+    "preprod": [],
+    "test": [ "role[base]", "recipe[apache]", "recipe[apache::copy_test_configs]" ],
+    "dev": [ "role[base]", "recipe[apache]", "recipe[apache::copy_dev_configs]" ]
+    },
+  "run_list": [ "role[base]", "recipe[apache]" ],
+  "description": "The webserver role",
+  "chef_type": "role",
+  "override_attributes": {
+  }
+}
+```
 
+
+## Run-lists
+
+A [run-list](https://docs.chef.io/run_lists.html) defines all necessary
+information for Chef to configure a node in a desired state. It is an
+ordered list of roles and/or recipes that are run in the exact order as
+defined in the run-list.
+
+- If a recipe apears more than once in a run-list, it will run only once
+- Run-list is stored as part of node object on Chef server
+- Managed by `knife` and uploaded to Chef server
+- Format: `'role[NAME]'`, `'recipe[COOKBOOK::RECIPE]'`,
+  `'recipe[COOKBOOK::RECIPE],COOKBOOK::RECIPE,role[NAME]'`
+- Empty run-list may suggest wrong configuration settings in `knife.rb`
+  or insufficient permissions for the user for Chef server and node with
+  `chef-client` running on it
+- Set the run-list for a node:
+```sh
+$ knife node run_list set test-node 'recipe[iptables]'
+```
+- Adding roles, recipes:
+```sh
+# Add a role
+$ knife node run_list add NODE_NAME 'role[ROLE_NAME]'
+
+# Add roles and recipes
+$ knife node run_list add NODE_NAME \
+  'recipe[COOKBOOK::RECIPE_NAME],recipe[COOKBOOK::RECIPE_NAME],role[ROLE_NAME]'
+
+# Add a recipe with fully-qualified domain name (FQDN)
+$ knife node run_list add NODE_NAME 'recipe[COOKBOOK::RECIPE_NAME]'
+
+# Add a recipe with a cookbook
+$ knife node run_list add NODE_NAME 'COOKBOOK::RECIPE_NAME'
+
+# Add the default recipe of a cookbook
+$ knife node run_list add NODE_NAME 'COOKBOOK'
+```
+- You can append `-a ITEM` or `--after ITEM` to add the run-list
+  elements after the item in the existing run-list, or use `-b ITEM` or
+  `--before ITEM` if you want to add the elements before the existing
+  run-list item
+- Remove roles, recipes:
+```sh
+# Remove a role
+$ knife node run_list remove NODE_NAME 'role[ROLE_NAME]'
+
+# Remove a recipe
+$ knife node run_list remove NODE_NAME 'recipe[COOKBOOK::RECIPE_NAME]'
+```
+- View status of run-lists using `knife`:
+```sh
+$ knife status --run-list
+
+# Query status for specific nodes
+$ knife status "role:web" --run-list
+```
 
 
 ## `file` resource
