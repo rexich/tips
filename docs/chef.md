@@ -1,4 +1,4 @@
-# Chef
+# Chef 101: Learning Server Provision with Chef
 
 Chef is a configuration management tool written in Ruby and Erlang. It
 uses a pure-Ruby, domain-specific language (DSL) for writing system
@@ -872,5 +872,3 @@ end
   end
 end
 ```
-
-
