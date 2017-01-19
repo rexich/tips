@@ -3,37 +3,43 @@
 Chef is a configuration management tool written in Ruby and Erlang. It
 uses a pure-Ruby, domain-specific language (DSL) for writing system
 configuration "recipes".
+It consists of a Chef server component that stores configuration data,
+and Chef clients installed onto nodes (computers being managed) that
+pull said data and apply the recipe's descriptions, in order to bring
+the system to the state defined in the recipes.
 
 
 ## Installation
-Chef client:
+
+Install Chef client onto a node:
+
 ```sh
 $ curl -L https://omnitruck.chef.io/install.sh | sudo bash
 ```
 
-Chef Development Kit:
+Chef Development Kit provides all the tools, including Chef server:
+
 ```sh
-$ curl -L https://omnitruck.chef.io/install.sh | sudo bash -s -- \
--P chefdk -c stable
+$ curl -L https://omnitruck.chef.io/install.sh | sudo bash -s -- -P chefdk -c stable
 ```
 
 
-## Nodes and Attributes
+## Nodes and attributes
 
-A [node](https://docs.chef.io/nodes.html) represents a machine managed
-by Chef, such as: server, cloud instance, virtual machine, network
-device, or virtualized container.
+[Nodes](https://docs.chef.io/nodes.html) represent machines managed by
+Chef, such as: servers, cloud instances, virtual machines, network
+devices, and virtualized containers.
 
-Each node is bootstrapped the first time and will have `chef-client`
-installed and the Chef server certificate provided and stored for safe
-communication and authentication
+To make a device a Chef node, it has to be bootstrapped, so it will have
+`chef-client` installed and Chef server certificate stored for safe
+communication and authentication with the server.
 
 Each node's specific details are gathered by Ohai at each `chef-client`
 run and provided as [attributes](https://docs.chef.io/attributes.html),
 such as an IP address, kernel version, list of loaded kernel modules,
-and so on. They can also be set and modified from the defaults in a
-cookbook, recipes, roles, and environments. Attributes lists are built
-from Ohai data, the node object stored on Chef server, and the updated
+and so on. They can also be set and modified from the defaults in
+cookbooks, recipes, roles, and environments. Attributes lists are built
+from Ohai data, the node object stored on Chef server, and updated
 generated node object from the current `chef-client` run.
 
 Attributes can be defined in the `attributes/` subfolder of a cookbook,
@@ -47,31 +53,31 @@ node.default['apache']['listen_ports'] = [ '80','443' ]
 
 Most frequently used attributes include:
 
-- `node['platform']` - platform on which a node is running, helps\
+- `node['platform']` - platform on which a node is running, helps
   determine which providers will be used
 - `node['platform_version']` - version of the platform
-- `node['ipaddress']` - IP address for a node; if the node has a default
+- `node['ipaddress']` - IP address of a node; if the node has a default
   route, this is the IPv4 address for the interface, otherwise the value
-  should be nil; recommended value: the IP address for default route
-- `node['macaddress']` - MAC address for a node, determined by the same
+  should be `nil`; recommended value: the IP address for default route
+- `node['macaddress']` - MAC address of a node, determined by the same
   interface that detects the `node['ipaddress']`
-- `node['fqdn']` - fully qualified domain name for a node, used as the
-  name of a node unless otherwise set
-- `node['hostname']` - host name for the node
-- `node['domain']` - domain for the node
+- `node['fqdn']` - fully qualified domain name (FQDN) of a node, used
+  as the name of a node unless otherwise set
+- `node['hostname']` - host name of the node
+- `node['domain']` - domain of the node
 - `node['recipes']` - a list of recipes associated with a node (and part
   of that node's run-list)
 - `node['roles']`  - a list of roles associated with a node (and part of
   that node's run-list)
-- `node['ohai_time']` - time at which Ohai was last run; not commonly
-  used in recipes, but it is saved to the Chef server and can be
-  accessed using the `knife status` subcommand
+- `node['ohai_time']` - time at which Ohai last run; not commonly used
+  in recipes, but it is saved to the Chef server and can be accessed
+  using the `knife status` subcommand
 
 Nodes can be managed using several available utilities:
 
 - `knife` can be used to create, edit, view, list, tag, and delete nodes
-- knife plug-ins can be used to create, edit, and manage nodes that are
-  located on cloud providers
+- `knife` plug-ins can be used to create, edit, and manage nodes located
+  on cloud providers
 - `chef-client` can be used to manage node data using the command line
   and JSON files; each JSON file contains a hash, the elements of which
   are added as node attributes; also, the run_list setting allows roles
@@ -83,26 +89,26 @@ Nodes can be managed using several available utilities:
 - The command line can also be used to edit JSON files and files that
   are related to third-party services, such as Amazon EC2, where the
   JSON files can contain per-instance metadata that is stored in a file
- on-disk and then read by chef-solo or chef-client as required
+  on-disk, and then read by `chef-solo` or `chef-client` as required
 
 
 ## `chef-client` and `chef-solo`
 
-The `chef-client` is [an agent](https://docs.chef.io/chef_client.html)
-that runs locally on every node managed by Chef server, and once it is
-run it will perform all steps required to bring a node to the expected
-state, and will skip configuring what is already in the wanted state
-(*test and repair* method). It handles the following:
+The [`chef-client`](https://docs.chef.io/chef_client.html) is an agent
+that runs locally on every node managed by Chef server, and once running
+it performs all steps required to bring a node to the expected state,
+and will skip configuring what is already in the wanted state (*test
+and repair* method). It handles:
 
-- registering and authenticating a node with the Chef server
-- building the node object
-- synchronizing cookbooks
-- compiling resource collection by loading each cookbook, recipe,
+- Registering and authenticating a node with the Chef server
+- Building the node object
+- Synchronizing cookbooks
+- Compiling the resource collection by loading each cookbook, recipe,
   attribute, and all dependencies
-- taking appropriate actions to configure the node
-- looking for exceptions and notifications, handling them as required
+- Taking appropriate actions to configure the node
+- Looking for exceptions and notifications, handling them as required
 
-RSA public key-pairs are used to authenticate the chef-client with Chef
+RSA public key-pairs are used to authenticate `chef-client` with a Chef
 server every time the client needs to access data stored on the server.
 
 Ohai detects attributes on the node and provides them to `chef-client`
@@ -110,28 +116,26 @@ at the start of every client's run.
 
 The [`chef-solo`](https://docs.chef.io/chef_solo.html) tool can be used
 to run `chef-client` in a way that does not require a Chef server to
-converge cookbooks, in a so-called 'local mode'.
+converge cookbooks, in a so-called 'local mode'. `chef-solo` has no
+centralized distribution of cookbooks or API, it lacks authentication
+and authorization, it can be run as a daemon, and it uses its own
+configuration file [`solo.rb`](https://docs.chef.io/config_rb_solo.html)
+to set paths and recipes to run. Usage: `chef-solo -c ~/chef/solo.rb`
 
-- `chef-solo` has no centralized distribution of cookbooks or API
-- It lacks authentication and authorizatio
-- Can be run as a daemon
-- Use its [configuration file](https://docs.chef.io/config_rb_solo.html)
-  `solo.rb` to set paths and recipes to run
-- Usage: `chef-solo -c ~/chef/solo.rb`
-
-You can also use `chef-client` in 'local mode' to run individual recipes
+You can also use `chef-client` in *local mode* to run individual recipes
 without contacting the Chef server: `chef-client --local-mode hello.rb`;
 or you simply run `chef-apply recipe.rb`, but it does not support
-templates at all.
+templates at all. Avoid doing this, since it may create a state
+different from what is expected from the cookbooks.
 
 
 ## `knife` management tool
-The [Knife](https://docs.chef.io/knife.html) utility provides an
-interface between local chef-repo and the Chef server. It is frequently
-used to manage the following:
+The [`knife`](https://docs.chef.io/knife.html) utility provides an
+interface between local Chef repository and the Chef server. It is
+used very frequently to manage the following:
 
 - nodes, cookbooks, recipes, roles
-- data bags (stores of JSON data, including encrypted ones)
+- data bags (stores of JSON data, including encrypted data)
 - environments, cloud resources (including provisioning)
 - installation of `chef-client` on management workstations
 - searching of indexed data on the Chef server
@@ -152,11 +156,10 @@ $ knife node list
 ```sh
 $ knife node show node_name
 ```
-- On each change of functionality (recipes) of your cookbook, you need
- to increase the version number in the `metadata.rb` file and upload
- the cookbook again on the Chef server:
+- On each change in your cookbook, you need to increase the version
+  number in the `metadata.rb` file and upload the cookbook again:
 ```sh
-$ knife cookbook upload le_cookbooke
+$ knife cookbook upload le_cookbook
 ```
 - Then, run Chef client on the node again to apply new configuration:
 ```sh
@@ -164,7 +167,7 @@ $ knife ssh localhost --ssh-port 2222 'sudo chef-client' --manual-list --ssh-use
 ```
 
 In practice, `chef-client` is set up to run periodically and get new
-configuration data from the Chef server; refer to the example in Roles.
+configuration data from the Chef server (refer to the example in Roles).
 
 Deleting data from the Chef server is performed like this:
 
@@ -184,7 +187,7 @@ $ knife cookbook delete learn_chef_apache2 --all --yes
 ```sh
 $ knife role delete web --yes
 ```
-- Delete RSA private key from your node - log into the node first:
+- Delete RSA private key from your node (SSH into the node first):
 ```sh
 $ sudo rm /etc/chef/client.pem
 ```
@@ -195,8 +198,8 @@ $ sudo rm /etc/chef/client.pem
 [Berkshelf](https://docs.chef.io/berkshelf.html) is a dependency manager
 for Chef cookbooks. It lets the user specify the cookbooks their project
 needs, and will automatically resolve which cookbooks depend on the
-specified ones and download them all. Afterwards, they can be uploaded
-in bulk to the Chef server, instead of one-by-one using `knife`.
+specified ones and download all of them. Afterwards, they can be
+uploaded in bulk to a Chef server, instead of one-by-one with `knife`.
 
 Getting cookbooks and their dependencies from the supermarket is done
 by writing a Berksfile in the project's top directory and provide a
@@ -226,7 +229,7 @@ path to the Chef server's SSL certificate, so the connection can be
 eastablished successfully.
 
 
-## Recipes
+## Recipes and data bags
 
 A [recipe](https://docs.chef.io/recipes.html) is a Ruby file that
 represents a collection of resources, used to define everything that is
@@ -242,6 +245,49 @@ program.
 
 - Including a recipe: `include_recipe 'recipe'`
 - Assign a dependency to a recipe: `depends 'apache2'`
+
+A [data bag](https://docs.chef.io/recipes.html#use-data-bags) is a
+global variable that is stored as JSON data and is accessible from a
+Chef server. A data bag is indexed for searching and can be loaded by a
+recipe or accessed during a search. The contents of a data bag can be
+loaded into a recipe. A typical data bag called `apps` looks like this:
+
+```json
+{
+  "id": "my_app",
+  "repository": "git://github.com/company/my_app.git"
+}
+```
+
+It can be accessed in a recipe using:
+
+```ruby
+my_bag = data_bag_item('apps', 'my_app')
+```
+
+Data bags can be encrypted as well. To generate a good key to be used
+for encrypting the data, type this in your command line:
+
+```sh
+$ openssl rand -base64 512 | tr -d '\r\n' > encrypted_data_bag_secret
+```
+
+The `encrypted_data_bag_secret` file will contain the key you can use to
+encrypt the contents of a data bag. In a recipe,
+`EncryptedDataBagItem.load` will load the encrypted data, but you need
+to use `EncryptedDataBagItem.load_secret` to get the secret key from
+the file and then use it for storing encrypted data on Chef server.
+
+```ruby
+# inside your attribute file:
+# default[:mysql][:secretpath] = 'C:\\chef\\any_secret_filename'
+#
+# inside your recipe:
+# look for secret in file pointed to by mysql attribute :secretpath
+mysql_secret = Chef::EncryptedDataBagItem.load_secret('#{node[:mysql][:secretpath]}')
+mysql_creds = Chef::EncryptedDataBagItem.load('passwords', 'mysql', mysql_secret)
+mysql_creds['pass'] # will be decrypted
+```
 
 
 ## Resources
@@ -273,7 +319,6 @@ grouping recipes. Default cookbook settings are kept in `default.rb` and
 are loaded first, and then other configuration files are loaded in
 alphabetical order, and can override settings in this file.
 
-
 - Generate a cookbook:
 ```sh
 $ mkdir cookbooks
@@ -288,11 +333,47 @@ $ chef generate template cookbooks/apache2 index.html
 $ sudo chef-client --local-mode --runlist 'recipe[learn_chef_apache2]'
 $ sudo chef-client --local-mode --runlist 'recipe[lol::default]'
 ```
-- Upload cookbook to Chef server and list them on server:
+- Upload cookbook to Chef server and list those on the server:
 ```sh
 $ knife cookbook upload le_cookbooke
 $ knife cookbook list
 ```
+
+Cookbooks contain a small amount of metadata in the file `metadata.rb`
+located in the root directory of a cookbook. They provide hints to the
+Chef server so it deploys the cookbooks correctly. Several methods are
+available to specify version constraints for cookbook dependencies, the
+first parameter is the package name, the second one is the version. The
+version can have an operator: <, <=, =, >=, ~>, or >.
+
+- `conflicts` - a cookbook conflicts with another cookbook or cookbook
+  version, and that cookbook should not exist on the Chef server; in
+  case it does, Chef server will not include the conflicting cookbook in
+  the set of cookbooks sent to the node when `chef-client` runs
+```ruby
+conflicts 'apache2', '< 3.0'
+conflicts 'daemon-tools'
+```
+- `depends` - a cookbook has a dependency on another cookbook, which
+  must exist on the Chef server, and it's important that it is accurate
+```ruby
+depends 'opscode-base'
+depends 'opscode-github', '> 1.0.0'
+depends 'runit', '~> 1.2.3'
+```
+- `provides`- add a recipe, definition, or resource that is provided by
+  this cookbook, should the auto-populated list be insufficient
+- `recommends` - add a dependency on another cookbook that is
+  recommended, but not required - a cookbook will still work even if
+  recommended dependencies are not available
+- `replaces` - whether this cookbook should replace another and can be
+  used in-place of that cookbook
+- `suggests` - add a dependency on another cookbook that is suggested,
+  but not required; weaker than `recommends`; a cookbook will still work
+  even when suggested dependencies are not available
+- `supports` - show that a cookbook has a supported platform; to specify
+  more than one platform, use more than one supports field, once for
+  each platform
 
 
 ## Roles
