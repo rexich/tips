@@ -67,9 +67,6 @@ Most frequently used attributes include:
   used in recipes, but it is saved to the Chef server and can be
   accessed using the `knife status` subcommand
 
-Use method `attribute?('attr_name')` to check whether attribute is
-defined and exists, useful for `if` conditionals.
-
 Nodes can be managed using several available utilities:
 
 - `knife` can be used to create, edit, view, list, tag, and delete nodes
@@ -916,3 +913,649 @@ end
   end
 end
 ```
+
+
+## Coding style and useful methods
+
+- Logging: within any of the recipes or cookbooks (Ruby files), you can
+log actions being taken by using the `Chef::Log` object, and call these
+methods in any place in your recipes/cookbooks (scripts):
+
+```
+Log Level     Syntax
+----------------------------------------
+Fatal         Chef::Log.fatal('string')
+Error         Chef::Log.error('string')
+Warning       Chef::Log.warn('string')
+Information   Chef::Log.info('string')
+Debug         Chef::Log.debug('string')
+```
+
+- Name things uniformly for their system and component, and avoid using
+  hyphens `-` in names of variables or resources:
+
+```ruby
+node['foo']['bar']    # attribute
+foo::bar              # recipe
+foo-bar               # role
+foo/bar, foo, /var    # directory
+```
+
+- Order the parameters in each resource declaration like this: source,
+  cookbook, ownership, permissions, notifications, action, e.g.:
+
+```ruby
+template '/tmp/foobar.txt' do
+  source 'foobar.txt.erb'
+  owner  'someuser'
+  group  'somegroup'
+  mode   '0644'
+  variables(
+    foo: 'bar'
+  )
+  notifies :reload, 'service[whatever]'
+  action :create
+end
+```
+
+- Write file modes as strings, not as integers: `mode '0755'`
+- Use strings instead of symbols: `default['foo']['bar'] = 'baz'`
+- Use single-quoted `'strings'` anywhere you can, except if you need to
+  perform string interpolation `"Hello #{name}!"`
+- Make sure your recipe is well-commented
+- Use `node.default` instead of `node.set`
+- Before uploading cookbooks to the Chef server, perform linting
+  (thorough checks for correctness) on them:
+
+```sh
+$ foodcritic -P -f all your-cookbook
+$ cookstyle your-cookbook
+```
+
+- Reloading an attribute:
+
+```ruby
+node.from_file(run_context.resolve_attribute('COOKBOOK_NAME', 'ATTR_FILE'))
+```
+
+- Helper methods to check for platform and branch and execute code
+  according to the necessary platform: `platform?`, `platform_family?`,
+  `value_for_platform`, `value_for_platform_family`
+- Use method `attribute?(name_of_attribute)` to execute something only
+  if an attribute is present in a specified node:
+
+```ruby
+if node.attribute?('ipaddress')
+  # the node has an ipaddress
+end
+```
+
+- To get the name of the currently running cookbook, use `cookbook_name`
+- Data bags are accessible anywhere in code using `data_bag(bag_name)`,
+  since it is a global variable
+- Use `data_bag_item(bag_name, item, secret)` to get data from a data
+  bag that is encrypted; if `secret` is not specified, `chef-client`
+  looks for it in the path defined by `encrypted_data_bag_secret` in
+  the `client.rb` file
+- Method `declare_resource(:resource_type, 'resource_name',
+  resource_attrs_block)` will declare a resource and add it to resource
+  collection
+  - `:resource_type` may be `:file`, `:template`, etc.
+  - `'resource_name'` defines resource's name (as in `file 'name' do`)
+  - `resource_attrs_block` defines resource's properties in a block
+
+```ruby
+declare_resource(:file, '/x/y.txy', caller[0]) do
+  action :delete
+end
+
+# Equivalent to:
+
+file '/x/y.txt' do
+  action :delete
+end
+
+```
+
+- Method `delete_resource(:resource_type, 'resource_name')` removes the
+  resource from the resource collection
+  - `delete_resource!(:resource_type, 'resource_name')` does the same,
+    but will raise an exception if resource is not found
+- Method `edit_resource(:resource_type, 'resource_name',
+  resource_attrs_block)` will edit a resource, or create a new one if it
+  does not exist
+  - `edit_resource!(:resource_type, 'resource_name')` does the same,
+    but will raise an exception if resource is not found
+
+```ruby
+edit_resource(:template, '/x/y.txy') do
+  cookbook_name: cookbook_name
+end
+
+# Resource block:
+
+edit_resource(:template, '/etc/aliases') do
+  source 'aliases.erb'
+  cookbook 'aliases'
+  variables({:aliases => {} })
+  notifies :run, 'execute[newaliases]'
+end
+```
+
+- Method `find_resource(:resource_type, 'resource_name')` finds a
+  resource in a resource collection
+  - `find_resource!(:resource_type, 'resource_name')` does the same,
+    but will raise an exception if resource is not found
+
+```ruby
+find_resource(:template, '/x/y.txy')
+
+# Resource block:
+
+find_resource(:template, '/etc/seapower') do
+  source 'seapower.erb'
+  cookbook 'seapower'
+  variables({:seapower => {} })
+  notifies :run, 'execute[newseapower]'
+end
+```
+
+- Method `platform?('parameter', 'parameter')` returns `true` if one of
+  the parameters matches `node['platform']` attribute created by Ohai,
+  and is usually used in `if`, `elsif`, or `case` statements
+  - `platform_family?('parameter', 'parameter')` does the same
+  - Available platforms: `aix`, `arch` (Arch Linux), `debian` (Debian,
+    Mint, Ubuntu), `fedora`, `freebsd`, `gentoo`, `hpux`, `mac_os_x`,
+    `netbsd`, `openbsd`, `slackware`, `solaris`, `suse`, `windows`
+- Method `reboot_pending?` returns `true` if node needs to be rebooted
+- Get the name of the currently running recipe with method `recipe_name`
+- Method `resources('resource_type[resource_name]')` gets a resource
+  from the resource collection
+
+```ruby
+file '/etc/hosts' do
+  content '127.0.0.1 localhost.localdomain localhost'
+end
+
+f = resources('file[/etc/hosts]')
+f.mode '0644'
+
+```
+
+- Method `search(:index, 'query')` allows queries to be made on all
+  types of data indexed by the Chef server (data bags and their items,
+  environments, nodes, roles)
+  - `:index` tells the name of index to search in: `:client`,
+  `:data_bag_name`, `:environment`, `:node`, `:role`
+
+```ruby
+webservers = search(:node, 'role:webserver')
+
+template '/tmp/list_of_webservers' do
+  source 'list_of_webservers.erb'
+  variables(:webservers => webservers)
+end
+```
+  - `:filter_result` supplied with a Hash will let you be more specific
+    and exact about your query:
+
+```ruby
+search(:node, 'role:web',
+  :filter_result => { 'name' => [ 'name' ],
+                      'ip' => [ 'ipaddress' ],
+                      'kernel_version' => [ 'kernel', 'version' ]
+                    }
+      ).each do |result|
+  puts result['name']
+  puts result['ip']
+  puts result['kernel_version']
+end
+```
+
+- For running shell commands, use `mixlib-shellout`, do not use Proc
+  objects or backticks!
+
+```sh
+$ gem install mixlib-shellout
+```
+
+```ruby
+require 'mixlib/shellout'
+find = Mixlib::ShellOut.new("find . -name '*.rb'")
+find.run_command
+```
+
+- Another way of running shell commands is `shell_out(command_args)`
+  - `shell_out!(command_args)` does the same, but raises an exception if
+    the command returns `false` (error code is not zero)
+  - `shell_out_with_systems_locale(command_args)` does the same as
+    `shell_out`, plus it uses the LC_ALL environment variables
+
+- You can add custom descriptions to a node using tags, and the methods
+  `tag('mytag')`, `tagged?('mytag')`, and `untag('mytag')` provide this:
+
+```ruby
+tag('machine')
+
+if tagged?('machine')
+   Chef::Log.info('Hey I'm #{node[:tags]}')
+end
+
+untag('machine')
+
+if not tagged?('machine')
+   Chef::Log.info('I has no tagz')
+end
+
+```
+
+- Method `value_for_platform` in a recipe allows you to select values
+  depending on `node['platform']` and `node['platform_version']`
+  - `value_for_platform_family` does the same
+
+```ruby
+package_name = value_for_platform(
+  ['centos', 'redhat', 'suse', 'fedora' ] => {
+    'default' => 'httpd'
+  },
+  ['ubuntu', 'debian'] => {
+    'default' => 'apache2'
+  }
+)
+
+package = value_for_platform(
+  'openbsd' => { 'default' => 'apache-couchdb' },
+  'gentoo' => { 'default' => 'dev-db/couchdb' },
+  'default' => 'couchdb'
+)
+
+value_for_platform(
+  'os1' => { '< 1.0' => 'less than 1.0',
+             '~> 2.0' => 'version 2.x',
+             '>= 3.0' => 'version 3.0',
+             '3.0.1' => '3.0.1 will always use this value' }
+)
+```
+
+- Method `with_run_context :type do ... end` is used to define a block
+  that has a pointer to a location in the `run_context` hierarchy
+  - Resources in recipes always run at the root of run_context hierarchy
+  - Custom resources and notification blocks always build a child
+    `run_context` which contains their sub-resources
+  - `:type` can be `:root` (runs the block as part of the root
+    `run_context` hierarchy), or `:parent` (runs the block as part of
+    the parent process in the `run_context` hierarchy)
+
+```ruby
+action :run do
+  with_run_context :root do
+    edit_resource(:my_thing, "accumulated state") do
+      action :nothing
+      my_array_property << accumulate_some_stuff
+    end
+  end
+  log "kick it off" do
+    notifies :run, "my_thing[accumulated state], :delayed
+  end
+end
+```
+
+Event handling in Chef is done using the `Chef.event_hander` method, on
+which a code block is attached, and inside `on :event_type` method is
+used to associate an event type with a callback code block.
+
+- `:event_type` can be one of: `:run_start`, `:run_failed`,
+  `:converge_failed`, `:resource_failed`, or `:recipe_not_found`
+
+```ruby
+Chef.event_handler do
+  on :run_failed do
+    HandlerSendEmail::Helper.new.send_email_on_run_failure(
+      Chef.run_context.node.name
+    )
+  end
+end
+
+# Testing the handler:
+
+ruby_block 'fail the run' do
+  block do
+    fail 'deliberately fail the run'
+  end
+end
+```
+
+
+## Writing Tests and Audits
+
+Performing audits and test can be done using the `control` method to
+define a specific series of tests that comprise an individual audit
+
+- The `control` method must be within a `control_group` code bloc
+- A `control_group` code block may contain multiple control methods
+
+```ruby
+control_group 'audit name' do
+  control 'name' do
+    it 'should do something' do
+      expect(something).to/.to_not be_something
+    end
+  end
+end
+```
+
+After `expect(something)`, you can use the following matchers:
+
+Matchers used for directories:
+
+- `be_directory` - test if directory exists:
+```ruby
+it 'should be a directory' do
+  expect(file('/var/directory')).to be_directory
+end
+```
+- `be_linked_to` - test if a subject is linked to the named directory:
+```ruby
+it 'should be linked to the named directory' do
+  expect(file('/etc/directory')).to be_linked_to('/etc/some/other/directory')
+end
+```
+- `be_mounted` - test if a directory is mounted:
+```ruby
+it 'should be mounted' do
+  expect(file('/')).to be_mounted
+end
+
+# For directories with a single attribute that requires testing:
+
+it 'should be mounted with an ext4 partition' do
+  expect(file('/')).to be_mounted.with( :type => 'ext4' )
+end
+
+# For directories with multiple attributes that require testing:
+
+it 'should be mounted only with certain attributes' do
+  expect(file('/')).to be_mounted.only_with(
+    :attribute => 'value',
+    :attribute => 'value',
+)
+end
+```
+
+Matchers used for files:
+
+- `be_executable` - test if a file is executable:
+```ruby
+it 'should be executable' do
+  expect(file('/etc/file')).to be_executable
+end
+
+# For a file that is executable by its owner:
+
+it 'should be executable by owner' do
+  expect(file('/etc/file')).to be_executable.by('owner')
+end
+
+# For a file that is executable by a group:
+
+it 'should be executable by group members' do
+  expect(file('/etc/file')).to be_executable.by('group')
+end
+
+# For a file that is executable by a specific user:
+
+it 'should be executable by user foo' do
+  expect(file('/etc/file')).to be_executable.by_user('foo')
+end
+```
+- `be_file` - test if a file exists:
+```ruby
+it 'should be a file' do
+  expect(file('/etc/file')).to be_file
+end
+```
+- `be_grouped_into` - test if a file is grouped into the named group:
+```ruby
+it 'should be grouped into foo' do
+  expect(file('/etc/file')).to be_grouped_into('foo')
+end
+```
+- `be_linked_to` - test if a subject is linked to the named file:
+```ruby
+it 'should be linked to the named file' do
+  expect(file('/etc/file')).to be_linked_to('/etc/some/other/file')
+end
+```
+- `be_mode` - test if a file is set to the specified mode:
+```ruby
+it 'should be mode 440' do
+  expect(file('/etc/file')).to be_mode(440)
+end
+```
+- `be_owned_by` - test if a file is owned by the named owner:
+```ruby
+it 'should be owned by the root user' do
+  expect(file('/etc/sudoers')).to be_owned_by('root')
+end
+```
+- `be_readable` - test if a file is readable:
+```ruby
+it 'should be readable' do
+  expect(file('/etc/file')).to be_readable
+end
+
+# For a file that is readable by its owner:
+
+it 'should be readable by owner' do
+  expect(file('/etc/file')).to be_readable.by('owner')
+end
+
+# For a file that is readable by a group:
+
+it 'should be readable by group members' do
+  expect(file('/etc/file')).to be_readable.by('group')
+end
+
+# For a file that is readable by a specific user:
+
+it 'should be readable by user foo' do
+  expect(file('/etc/file')).to be_readable.by_user('foo')
+end
+```
+- `be_socket` - test if a file exists as a socket:
+```ruby
+it 'should be a socket' do
+  expect(file('/var/file.sock')).to be_socket
+end
+```
+- `be_symlink` - test if a file exists as a symbolic link:
+```ruby
+it 'should be a symlink' do
+  expect(file('/etc/file')).to be_symlink
+end
+```
+- `be_writable` - test if a file is writable:
+```ruby
+it 'should be writable' do
+  expect(file('/etc/file')).to be_writable
+end
+
+# For a file that is writable by its owner:
+
+it 'should be writable by owner' do
+  expect(file('/etc/file')).to be_writable.by('owner')
+end
+
+# For a file that is writable by a group:
+
+it 'should be writable by group members' do
+  expect(file('/etc/file')).to be_writable.by('group')
+end
+
+# For a file that is writable by a specific user:
+
+it 'should be writable by user foo' do
+  expect(file('/etc/file')).to be_writable.by_user('foo')
+end
+```
+- `contain` - test if a file contains specific contents:
+```ruby
+it 'should contain docs.chef.io' do
+  expect(file('/etc/file')).to contain('docs.chef.io')
+end
+```
+
+Matchers used for packages:
+
+- `be_installed` - test if the named package is installed:
+```ruby
+it 'should be installed' do
+  expect(package('httpd')).to be_installed
+end
+
+# For a specific package version:
+
+it 'should be installed' do
+  expect(package('httpd')).to be_installed.with_version('0.1.2')
+end
+```
+
+Matchers used for ports:
+
+- `be_listening` - test if the named port is listening:
+```ruby
+it 'should be listening' do
+  expect(port(23)).to be_listening
+end
+
+# For a named port that is not listening:
+
+it 'should not be listening' do
+  expect(port(23)).to_not be_listening
+end
+
+# For a specific port type use .with('port_type'). For example, UDP:
+
+it 'should be listening with UDP' do
+  expect(port(23)).to_not be_listening.with('udp')
+end
+
+# For UDP, version 6:
+
+it 'should be listening with UDP6' do
+  expect(port(23)).to_not be_listening.with('udp6')
+end
+
+# For TCP/IP:
+
+it 'should be listening with TCP' do
+  expect(port(23)).to_not be_listening.with('tcp')
+end
+
+# For TCP/IP, version 6:
+
+it 'should be listening with TCP6' do
+  expect(port(23)).to_not be_listening.with('tcp6')
+end
+```
+
+Matchers used for services:
+
+- `be_enabled` - test if the named service is enabled and that will
+  start up automatically):
+```ruby
+it 'should be enabled' do
+  expect(service('ntpd')).to be_enabled
+end
+
+# For a service that is enabled at a given run level:
+
+it 'should be enabled at the specified run level' do
+  expect(service('ntpd')).to be_enabled.with_level(3)
+end
+```
+- `be_running` - test if the named service is running:
+```ruby
+it 'should be running' do
+  expect(service('ntpd')).to be_running
+end
+
+# For a service that is running under supervisor:
+
+it 'should be running under supervisor' do
+  expect(service('ntpd')).to be_running.under('supervisor')
+end
+
+# or daemontools:
+
+it 'should be running under daemontools' do
+  expect(service('ntpd')).to be_running.under('daemontools')
+end
+
+# or Upstart:
+
+it 'should be running under upstart' do
+  expect(service('ntpd')).to be_running.under('upstart')
+end
+```
+- `be_monitored_by` - test if the named service is being monitored by
+  the named monitoring application:
+```ruby
+it 'should be monitored by' do
+  expect(service('ntpd')).to be_monitored_by('monit')
+end
+```
+
+Example of a `control_group` block with several `control` blocks:
+
+```ruby
+control_group 'Audit Mode' do
+
+  control 'mysql package' do
+    it 'should be installed' do
+      expect(package('mysql')).to be_installed.with_version('5.6')
+    end
+  end
+
+  control 'postgres package' do
+    it 'should not be installed' do
+      expect(package('postgresql')).to_not be_installed
+    end
+  end
+
+  control 'mysql service' do
+    let(:mysql_service) { service('mysql') }
+    it 'should be enabled' do
+      expect(mysql_service).to be_enabled
+    end
+    it 'should be running' do
+      expect(mysql_service).to be_running
+    end
+  end
+
+  control 'mysql config directory' do
+    let(:config_dir) { file('/etc/mysql') }
+    it 'should exist with correct permissions' do
+      expect(config_dir).to be_directory
+      expect(config_dir).to be_mode(0700)
+    end
+    it 'should be owned by the db user' do
+      expect(config_dir).to be_owned_by('db_service_user')
+    end
+  end
+
+  control 'mysql config file' do
+    let(:config_file) { file('/etc/mysql/my.cnf') }
+    it 'should exist with correct permissions' do
+      expect(config_file).to be_file
+      expect(config_file).to be_mode(0400)
+    end
+    it 'should contain required configuration' do
+      expect(config_file.content).to match(/default-time-zone='UTC'/)
+    end
+  end
+
+end
+```
+
+Do not use duplicate names for `control` blocks, exception will raise.
