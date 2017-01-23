@@ -1,0 +1,23 @@
+---
+driver:
+  name: vagrant
+
+provisioner:
+  name: chef_solo
+
+platforms:
+  - name: ubuntu-14.04
+  - name: ubuntu-10.04
+  - name: centos-7.3
+suites:
+  - name: default
+    run_list:
+      - recipe[git::default]
+    attributes:
+  - name: server
+    run_list:
+      - recipe[git::server]
+    attributes:
+    excludes:
+      - ubuntu-10.04
+      - centos-7.3
