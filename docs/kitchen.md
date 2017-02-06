@@ -1,7 +1,30 @@
-# Kitchen 101: Using Kitchen for Continuous Integration with Chef
+# Test Kitchen 101: Using Test Kitchen for Continuous Integration with Chef
 
 Kitchen is used for continuous integration testing of Chef recipes in a
-Vagrant environment.
+Vagrant environment. It allows us to test our cookbooks and recipes in a
+virtual environtment before we finally submit them to the Chef server.
+
+
+## Installation
+
+Install the two gems that comprise Kitchen and its Vagrant plugin:
+
+```sh
+$ gem install test-kitchen kitchen-vagrant
+```
+
+Kitchen will be installed. To check it version, type:
+
+```sh
+$ kitchen version
+Test Kitchen version 1.15.0
+```
+
+This confirms that Kitchen is installed successfully and is ready for use.
+You can see a list of available commands anytime using `kitchen help`.
+
+
+## Using Kitchen 
 
 In the directory where the Chef repo is located, we issue:
 
@@ -10,7 +33,7 @@ $ kitchen init --driver=kitchen-vagrant
 ```
 
 Kitchen will create its configuration files and set things up for the
-testing. You might need to issue the command with `sudo` prepended, in
+testing. You *might* need to issue the command with `sudo` prepended, in
 order to install the necessary driver gems. The file `.kitchen.yml` in
 the root of the Chef repo contains the configuration for Kitchen:
 
