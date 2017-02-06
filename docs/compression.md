@@ -1,6 +1,6 @@
 # Testing compression algorithms for cache
 
-## Compressing local Git repository of a project, ~554 MiB
+## Compressing local Git repository of a project, ~457.8 MiB
 
 ### Attempt no. 1: compression level 6, XZ
 
@@ -22,6 +22,7 @@ Notes:
 - Documentation shows that multithreading is NOT implemented yet
 - Output file size: 117.7 MiB
 - Total run time: ~3 minutes 26 seconds
+- Output size: 25% of the original, 75% savings
 
  
 ### Attempt no. 2: compression level 4, XZ
@@ -41,6 +42,7 @@ Notes:
 
 - Output file size: 126.2 MiB
 - Total run time: ~2 minutes 15 seconds
+- Output size: 27.5% of the original, 72.5% savings
 
 
 ### Attempt no. 3: compression level 9, GZIP
@@ -60,6 +62,7 @@ Notes:
 
 - Output file size: 182 MiB
 - Total run time: ~1 minute 49 seconds
+- Output size: 39.7% of the original, 60.3% savings
 
 
 ### Attempt no. 4: compression level 6, GZIP
@@ -77,6 +80,7 @@ Result:
 
 - Output file size: 183.3 MiB
 - Total run time: ~23 seconds
+- Output size: 40% of the original, 60% savings
 
 
 ### Attempt no. 5: compression level 4, GZIP
@@ -94,6 +98,7 @@ Result:
 
 - Output file size: 188.3 MiB
 - Total run time: ~15 seconds
+- Output size: 41.1% of the original, 58.9% savings
 
 
 ### Attempt no. 6: compression level 3, GZIP
@@ -111,6 +116,7 @@ Result:
 
 - Output file size: 193.2 MiB
 - Total run time: ~15 seconds
+- Output size: 42.2% of the original, 57.8% savings
 
 
 ### Attempt no. 7: compression level 4, PIGZ (parallel gzip)
@@ -131,6 +137,7 @@ sys   0m0.916s
 - Total run time: ~6 seconds
 - Interestingly, it saved ~0.5 MiB and ran twice as fast as GZIP with
   compression level 4!
+- Output size: 41% of the original, 59% savings
 
 
 ### Attempt no. 8: compression level 6, PIGZ (parallel gzip)
@@ -152,6 +159,7 @@ sys   0m0.924s
 - Total run time: ~9 seconds
 - Even better, it saved ~0.3 MiB and ran almost three times faster than
   GZIP with compression level 6!
+- Output size: 39.9% of the original, 60.1% savings
 
 
 ### Attempt no. 9: compression level 9, PIGZ (parallel gzip)
@@ -173,6 +181,7 @@ sys   0m0.928s
 - Total run time: ~40 seconds
 - It saved ~0.1 MiB and ran almost 2,72 times faster than GZIP with
   compression level 9!
+- Output size: 39.7% of the original, 60.3% savings
 
 
 ## Conclusions
