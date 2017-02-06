@@ -1,12 +1,12 @@
 # Testing compression algorithms for cache
 
-## Compressing local Git repository of Job Runner, ~554 MiB
+## Compressing local Git repository of a project, ~554 MiB
 
 ### Attempt no. 1: compression level 6, XZ
 
 Command:
 
-`XZ_OPT="-6" time tar -c -v -J -f test6.tar.xz job_runner/`
+`XZ_OPT="-6" time tar -c -v -J -f test6.tar.xz project/`
 
 Result:
 
@@ -28,7 +28,7 @@ Notes:
 
 Command:
 
-`XZ_OPT="-4" time tar -c -v -J -f test4.tar.xz job_runner/`
+`XZ_OPT="-4" time tar -c -v -J -f test4.tar.xz project/`
 
 Result:
 
@@ -47,7 +47,7 @@ Notes:
 
 Command:
 
-`GZIP=-9 time tar -c -v -z -f test9.tar.gz job_runner/`
+`GZIP=-9 time tar -c -v -z -f test9.tar.gz project/`
 
 Result:
 
@@ -66,7 +66,7 @@ Notes:
 
 Command:
 
-`GZIP=-6 time tar -c -v -z -f test6.tar.gz job_runner/`
+`GZIP=-6 time tar -c -v -z -f test6.tar.gz project/`
 
 Result:
 
@@ -83,7 +83,7 @@ Result:
 
 Command:
 
-`GZIP=-4 time tar -c -v -z -f test4.tar.gz job_runner/`
+`GZIP=-4 time tar -c -v -z -f test4.tar.gz project/`
 
 Result:
 
@@ -100,7 +100,7 @@ Result:
 
 Command:
 
-`GZIP=-3 time tar -c -v -z -f test3.tar.gz job_runner/`
+`GZIP=-3 time tar -c -v -z -f test3.tar.gz project/`
 
 Result:
 
@@ -117,7 +117,7 @@ Result:
 
 Command:
 
-`time tar cf - job_runner/ | pigz -4 -p 4 > test4p.tar.gz`
+`time tar cf - project/ | pigz -4 -p 4 > test4p.tar.gz`
 
 Result:
 
@@ -137,7 +137,7 @@ sys   0m0.916s
 
 Command:
 
-`time tar cf - job_runner/ | pigz -6 -p 4 > test6p.tar.gz`
+`time tar cf - project/ | pigz -6 -p 4 > test6p.tar.gz`
 
 Result:
 
@@ -154,11 +154,11 @@ sys   0m0.924s
   GZIP with compression level 6!
 
 
-### Attempt no. 8: compression level 9, PIGZ (parallel gzip)
+### Attempt no. 9: compression level 9, PIGZ (parallel gzip)
 
 Command:
 
-`time tar cf - job_runner/ | pigz -9 -p 4 > test9p.tar.gz`
+`time tar cf - project/ | pigz -9 -p 4 > test9p.tar.gz`
 
 Result:
 
@@ -185,8 +185,8 @@ sys   0m0.928s
   of savings, so we should go with level 4
 - Unfortunately, GZIP is also single-threaded
 - PIGZ is a parallel implementation of GZIP, and is *much faster* than
-  the other algorithms - definitely better suited for our task
-- PIGZ with compression level 6 or 4 sounds like a good choice for us
+  the other algorithms - definitely better suited
+- PIGZ with compression level 6 or 4 sounds like a good choice
 
 PIGZ installation: `sudo apt-get install pigz`
 PIGZ manual: `http://www.zlib.net/pigz/pigz.pdf`
